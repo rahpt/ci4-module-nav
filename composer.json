@@ -1,0 +1,63 @@
+{
+    "name": "rahpt/ci4-module-nav",
+    "description": "Navigation and breadcrumb management system for CodeIgniter 4 modules",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "codeigniter",
+        "codeigniter4",
+        "modules",
+        "navigation",
+        "menu",
+        "breadcrumbs"
+    ],
+    "homepage": "https://github.com/rahpt/ci4-module-nav",
+    "support": {
+        "issues": "https://github.com/rahpt/ci4-module-nav/issues",
+        "source": "https://github.com/rahpt/ci4-module-nav",
+        "docs": "https://github.com/rahpt/ci4-module-nav#readme"
+    },
+    "authors": [
+        {
+            "name": "Rahpt",
+            "email": "dev@example.com",
+            "homepage": "https://github.com/rahpt",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "codeigniter4/framework": "^4.5",
+        "rahpt/ci4-module": "^1.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5",
+        "codeigniter4/devkit": "^1.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Rahpt\\Ci4ModuleNav\\": "src/"
+        },
+        "files": [
+            "src/Helpers/menu_helper.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Rahpt\\Ci4ModuleNav\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test:coverage": "phpunit --coverage-html build/coverage"
+    },
+    "extra": {
+        "codeigniter4": {
+            "discover": [
+                "Rahpt\\Ci4ModuleNav\\Config\\Registrar"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
