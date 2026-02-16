@@ -11,6 +11,14 @@ class MenuNavigation {
      * Retorna a rota atual limpa
      */
     public static function currentRoute(): string {
+        $router = service('router');
+        $opts = $router->getMatchedRouteOptions();
+        
+        // Return the route name (alias) if it exists, otherwise the path
+        if (isset($opts['as'])) {
+            return $opts['as'];
+        }
+
         $uri = service('request')->getUri();
         return trim($uri->getPath() ?: '', '/');
     }
@@ -19,16 +27,26 @@ class MenuNavigation {
      * Verifica se um item de menu está ativo baseando-se na rota
      */
     public static function isActive(string $route): bool {
-        $current = self::currentRoute();
+        $router = service('router');
+        $opts = $router->getMatchedRouteOptions();
+        $currentName = $opts['as'] ?? null;
+        
+        $uri = service('request')->getUri();
+        $currentPath = trim($uri->getPath() ?: '', '/');
+        
         $normalizedRoute = trim($route, '/');
 
-        if ($normalizedRoute === '') {
-            return $current === '';
+        // Check by Route Name (Alias)
+        if ($currentName === $normalizedRoute) {
+            return true;
         }
 
-        // Verifica se a rota atual começa com a rota do menu
-        // Ex: current = 'system/modules/marketplace', route = 'system/modules' -> true
-        return $current === $normalizedRoute || str_starts_with($current, $normalizedRoute . '/');
+        // Check by URI Path
+        if ($normalizedRoute === '') {
+            return $currentPath === '';
+        }
+
+        return $currentPath === $normalizedRoute || str_starts_with($currentPath, $normalizedRoute . '/');
     }
 
     /**
