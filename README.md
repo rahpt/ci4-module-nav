@@ -1,6 +1,6 @@
 # CodeIgniter 4 Module Navigation
 
-[![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](https://github.com/rahpt/ci4-module-nav)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/rahpt/ci4-module-nav)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PHP](https://img.shields.io/badge/php-%3E%3D8.1-brightgreen.svg)](https://php.net)
 
@@ -322,6 +322,18 @@ composer test
 
 ---
 
+## 🕒 Histórico de Versões
+
+### [1.1.0] - 2026-02-16
+- **Melhoria**: Integrado suporte a **Rota Nomeada (Alias)** em `currentRoute()`, tornando os breadcrumbs e menus ativos imunes a mudanças de URL.
+- **Performance**: Implementação de escuta de eventos (`rahpt.module.changed`) para limpeza reativa de cache de menus, eliminando verificação manual de status.
+- **Arquitetura**: Uso do `Registrar` para carregamento automático de Eventos e Helpers.
+
+### [1.0.1] - 2026-02-15
+- Versão inicial estável.
+
+---
+
 ## 📄 Licença
 
 MIT License
@@ -334,5 +346,5 @@ Desenvolvido por **Rahpt**
 
 ---
 
-**Versão**: 1.0.1  
-**Última Atualização**: 2026-02-15
+**Versão**: 1.1.0  
+**Última Atualização**: 2026-02-16

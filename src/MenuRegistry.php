@@ -31,7 +31,7 @@ class MenuRegistry {
                 continue;
             }
 
-            $modulePath = $data['path'] ?? "Modules/" . ucfirst($name);
+            $modulePath = $data['path'] ?? $config->basePath . "/" . ucfirst($name);
             $moduleFolder = basename($modulePath);
             $class = $config->baseNamespace . "\\{$moduleFolder}\\Config\\Module";
 

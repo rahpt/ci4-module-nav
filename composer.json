@@ -9,7 +9,8 @@
         "modules",
         "navigation",
         "menu",
-        "breadcrumbs"
+        "breadcrumbs",
+        "rahpt"
     ],
     "homepage": "https://github.com/rahpt/ci4-module-nav",
     "support": {
@@ -20,7 +21,7 @@
     "authors": [
         {
             "name": "Rahpt",
-            "email": "dev@example.com",
+            "email": "ci4-module@rah.pt",
             "homepage": "https://github.com/rahpt",
             "role": "Developer"
         }
