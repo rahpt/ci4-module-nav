@@ -1,6 +1,6 @@
 # CodeIgniter 4 Module Navigation
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/rahpt/ci4-module-nav)
+[![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](https://github.com/rahpt/ci4-module-nav)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PHP](https://img.shields.io/badge/php-%3E%3D8.1-brightgreen.svg)](https://php.net)
 
@@ -334,5 +334,5 @@ Desenvolvido por **Rahpt**
 
 ---
 
-**Versão**: 1.1.0  
+**Versão**: 1.0.1  
 **Última Atualização**: 2026-02-15
