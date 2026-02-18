@@ -14,6 +14,7 @@ class EventHandlers
      */
     public static function onModuleChanged(): void
     {
+        log_message('debug', 'MenuRegistry::clearCache() triggered by event');
         MenuRegistry::clearCache();
     }
 }
