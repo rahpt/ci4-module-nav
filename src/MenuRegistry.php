@@ -45,15 +45,25 @@ class MenuRegistry
 
             if (class_exists($class)) {
                 $moduleInstance = new $class();
+                $priority = $moduleInstance->priority ?? 0;
+
                 if (method_exists($moduleInstance, 'menu')) {
                     foreach ($moduleInstance->menu() as $menu) {
                         // Inject module name for tenancy/permission filtering
                         $menu['_module'] = $name;
+                        $menu['_priority'] = $priority;
                         $menus[] = $menu;
                     }
                 }
             }
         }
+
+        // Sort menus by priority (ascending)
+        usort($menus, function ($a, $b) {
+            $pa = $a['_priority'] ?? 0;
+            $pb = $b['_priority'] ?? 0;
+            return $pa <=> $pb;
+        });
 
         return $menus;
     }
