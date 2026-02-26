@@ -14,7 +14,10 @@ class MenuRegistry
     public static function all(): array
     {
         $cache = service('cache');
-        $cacheKey = 'module_menus_raw';
+
+        // Use user ID in cache key to avoid collisions with dynamic routes (like UIDs in menu)
+        $userId = function_exists('auth') && auth()->user() ? auth()->user()->id : 'guest';
+        $cacheKey = "module_menus_user_{$userId}";
 
         if (!($menus = $cache->get($cacheKey))) {
             $menus = self::discoverMenus();

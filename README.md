@@ -1,6 +1,6 @@
 # CodeIgniter 4 Module Navigation
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/rahpt/ci4-module-nav)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/rahpt/ci4-module-nav)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PHP](https://img.shields.io/badge/php-%3E%3D8.1-brightgreen.svg)](https://php.net)
 
@@ -324,6 +324,10 @@ composer test
 
 ## 🕒 Histórico de Versões
 
+### [1.2.0] - 2026-02-26
+- **Bug Fix**: Resolvido problema de colisão de cache entre usuários. O cache agora é segmentado por ID de usuário para suportar menus com dados dinâmicos (como UIDs de perfil).
+- **Melhoria**: Refatoração da chave de cache para maior isolamento de dados entre sessões.
+
 ### [1.1.0] - 2026-02-16
 - **Melhoria**: Integrado suporte a **Rota Nomeada (Alias)** em `currentRoute()`, tornando os breadcrumbs e menus ativos imunes a mudanças de URL.
 - **Performance**: Implementação de escuta de eventos (`rahpt.module.changed`) para limpeza reativa de cache de menus, eliminando verificação manual de status.
@@ -346,5 +350,5 @@ Desenvolvido por **Rahpt**
 
 ---
 
-**Versão**: 1.1.0  
-**Última Atualização**: 2026-02-16
+**Versão**: 1.2.0  
+**Última Atualização**: 2026-02-26
