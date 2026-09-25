@@ -9,22 +9,41 @@ class MenuRegistry
 {
 
     /**
-     * Returns the consolidated list of menus from all active modules, filtered by permissions.
+     * Cache version key for atomic cache busting across all users and tenants.
+     */
+    protected const CACHE_VERSION_KEY = 'module_menus_version';
+
+    /**
+     * Returns the consolidated list of menus from all active modules, filtered by permissions and tenant.
      */
     public static function all(): array
     {
         $cache = service('cache');
+        $version = (int) ($cache->get(self::CACHE_VERSION_KEY) ?? 1);
 
-        // Use user ID in cache key to avoid collisions with dynamic routes (like UIDs in menu)
         $userId = function_exists('auth') && auth()->user() ? auth()->user()->id : 'guest';
-        $cacheKey = "module_menus_user_{$userId}";
+        $tenantId = function_exists('tenant') && tenant() ? (string) tenant() : 'global';
 
-        if (!($menus = $cache->get($cacheKey))) {
-            $menus = self::discoverMenus();
-            $cache->save($cacheKey, $menus, 3600);
+        // Contextual cache key incorporating version, tenant, and user ID
+        $cacheKey = "module_menus_v{$version}_{$tenantId}_{$userId}";
+
+        if (($cachedMenus = $cache->get($cacheKey)) !== null) {
+            return $cachedMenus;
         }
 
-        return self::applyFilters($menus);
+        // Retrieve raw menus (cached across users within the current version)
+        $rawCacheKey = "module_menus_raw_v{$version}";
+        if (($rawMenus = $cache->get($rawCacheKey)) === null) {
+            $rawMenus = self::discoverMenus();
+            $cache->save($rawCacheKey, $rawMenus, 3600);
+        }
+
+        $filtered = self::applyFilters($rawMenus);
+
+        // Cache filtered menu for this user/tenant context
+        $cache->save($cacheKey, $filtered, 3600);
+
+        return $filtered;
     }
 
     /**
@@ -85,11 +104,11 @@ class MenuRegistry
 
             if (isset($item['items']) && is_array($item['items'])) {
                 $item['items'] = self::applyFilters($item['items']);
+            }
 
-                // Optional: hide parent if all children are filtered out
-                // if (empty($item['items']) && isset($item['route']) && $item['route'] === '#') {
-                //     continue;
-                // }
+            // Security: sanitize labels and urls if needed
+            if (isset($item['label']) && function_exists('esc')) {
+                $item['label_escaped'] = esc($item['label'], 'html');
             }
 
             $filtered[] = $item;
@@ -111,7 +130,7 @@ class MenuRegistry
                 if (isset($tenancyConfig->tenantProfiles[$tenantId]['modules'])) {
                     $allowedModules = $tenancyConfig->tenantProfiles[$tenantId]['modules'];
                     // If the module is not in the tenant's allowed list, hide it
-                    if (!in_array($item['_module'], $allowedModules) && !in_array(ucfirst($item['_module']), $allowedModules)) {
+                    if (!in_array($item['_module'], $allowedModules, true) && !in_array(ucfirst($item['_module']), $allowedModules, true)) {
                         return false;
                     }
                 }
@@ -139,7 +158,7 @@ class MenuRegistry
             $currentTenantId = tenant();
             $allowedTenants = (array) $item['tenant'];
 
-            if ($currentTenantId && !in_array($currentTenantId, $allowedTenants)) {
+            if ($currentTenantId && !in_array($currentTenantId, $allowedTenants, true)) {
                 return false;
             }
         }
@@ -155,10 +174,20 @@ class MenuRegistry
     }
 
     /**
-     * Clears the menu cache.
+     * Atomically clears the menu cache across all tenants and users.
+     * Increments the cache version to instantly invalidate existing entries.
      */
     public static function clearCache(): void
     {
-        service('cache')->delete('module_menus_raw');
+        $cache = service('cache');
+        $currentVersion = (int) ($cache->get(self::CACHE_VERSION_KEY) ?? 1);
+        $nextVersion = $currentVersion + 1;
+
+        // Save new version to invalidate all current cache keys in O(1)
+        $cache->save(self::CACHE_VERSION_KEY, $nextVersion, 86400 * 30);
+
+        // Delete raw cache for previous version
+        $cache->delete("module_menus_raw_v{$currentVersion}");
+        $cache->delete('module_menus_raw');
     }
 }
