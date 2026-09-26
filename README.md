@@ -1,20 +1,46 @@
 # CodeIgniter 4 Module Navigation
 
-[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/rahpt/ci4-module-nav)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/rahpt/ci4-module-nav)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PHP](https://img.shields.io/badge/php-%3E%3D8.1-brightgreen.svg)](https://php.net)
 
-Sistema de navegação e breadcrumbs para módulos CodeIgniter 4. Consolida menus de todos os módulos ativos e gerencia breadcrumbs automaticamente.
+Sistema corporativo de navegação, menus dinâmicos e breadcrumbs para módulos CodeIgniter 4. Possui filtragem avançada por permissões (Shield), isolamento Multi-Tenancy, renderizador seguro de ícones (`IconRegistry`), invalidação de cache reativa e proteção contra ataques de injeção.
 
 ---
 
-## 📋 Características
+## 📋 Índice
 
-- ✅ **Menu Consolidado** - Agrega menus de todos os módulos ativos
-- ✅ **Breadcrumbs Automáticos** - Sistema de breadcrumbs com helper functions
-- ✅ **Caching** - Cache de menus para melhor performance (1 hora)
-- ✅ **Auto-Discovery** - Descobre menus automaticamente de módulos
-- ✅ **Flexível** - Suporta menus hierárquicos e customizados
+- [Características](#-características)
+- [Instalação](#-instalação)
+- [Definição de Menus no Módulo](#-definição-de-menus-no-módulo)
+- [Filtros de Visibilidade e Segurança](#-filtros-de-visibilidade-e-segurança)
+- [IconRegistry Seguro](#-iconregistry-seguro)
+- [Cache Multi-Tenant e ACL Versionado](#-cache-multi-tenant-e-acl-versionado)
+- [Breadcrumbs e Helpers](#-breadcrumbs-e-helpers)
+- [Exibição em Layouts](#-exibição-em-layouts)
+- [API Reference](#-api-reference)
+- [Histórico de Versões](#-histórico-de-versões)
+- [Licença](#-licença)
+
+---
+
+## ✨ Características
+
+### Navegação & Descoberta
+- ✅ **Menu Centralizado** - Agrega e ordena automaticamente os menus de todos os módulos ativos via `priority`.
+- ✅ **Menús Agrupados** - Agrupamento automático por seções e categorias via `MenuRegistry::grouped()`.
+- ✅ **Rota Nomeada (Alias)** - Suporte nativo ao helper `url_to($route)` através da chave `route`.
+- ✅ **Breadcrumbs Inteligentes** - Rastreamento com marcação semântica e suporte a helpers de visualização.
+
+### Segurança & Zero-Trust
+- ✅ **IconRegistry Seguro** - Allowlist estrita de ícones evitando injeção de HTML ou quebra de atributos em tags `<i>`.
+- ✅ **Sanitização de URLs e Labels** - Bloqueio de protocolos inseguros (`javascript:`, `data:`, `vbscript:`) e escape HTML automático (`label_escaped`).
+- ✅ **Filtro Shield (RBAC)** - Visibilidade condicional por permissões (`permission`) e grupos (`group`).
+- ✅ **Filtro Multi-Tenancy** - Exibição condicionada ao tenant ativo, escopo global ou allowlist de empresas/perfis.
+
+### Performance & Cache
+- ✅ **Cache Isolado Multi-Tenant/ACL** - Chaves de cache segmentadas por tenant, usuário e hash de grupos/permissões (`aclHash`).
+- ✅ **Invalidação Reativa por Evento** - Limpeza atômica em resposta ao evento `rahpt.module.changed` incrementando a versão do cache.
 
 ---
 
@@ -26,36 +52,45 @@ composer require rahpt/ci4-module-nav
 
 ---
 
-## 📖 Uso Básico
+## 📖 Definição de Menus no Módulo
 
-### Definir Menu no Módulo
+Em qualquer módulo CodeIgniter 4 estendendo `BaseModule`, implemente o método `menu()`:
 
 ```php
-// app/Modules/Dashboard/Config/Module.php
+<?php
+
+namespace App\Modules\Contratos\Config;
+
+use Rahpt\Ci4Module\BaseModule;
+
 class Module extends BaseModule
 {
+    public string $name = 'Contratos';
+    public int $priority = 20;
+
     public function menu(): array
     {
         return [
             [
-                'label' => 'Dashboard',
-                'url' => 'dashboard',
-                'icon' => 'fas fa-tachometer-alt',
-                'order' => 1
-            ],
-            [
-                'label' => 'Relatórios',
-                'url' => 'dashboard/reports',
-                'icon' => 'fas fa-chart-bar',
-                'order' => 2,
-                'children' => [
+                'label'      => 'Contratos',
+                'route'      => 'contracts.index',          // Rota nomeada via url_to()
+                'icon'       => 'contracts',                // Resolvido via IconRegistry
+                'permission' => 'contracts.view',           // Checagem Shield: $user->can('contracts.view')
+                'group'      => ['admin', 'gestor'],        // Checagem Shield: $user->inGroup(...)
+                'tenant'     => true,                       // Apenas visível em contexto de tenant ativo
+                'order'      => 10,
+                'items'      => [
                     [
-                        'label' => 'Vendas',
-                        'url' => 'dashboard/reports/sales'
+                        'label'      => 'Novo Contrato',
+                        'url'        => 'contratos/novo',
+                        'icon'       => 'file',
+                        'permission' => 'contracts.create'
                     ],
                     [
-                        'label' => 'Financeiro',
-                        'url' => 'dashboard/reports/financial'
+                        'label'      => 'Relatórios Financeiros',
+                        'url'        => 'contratos/relatorios',
+                        'icon'       => 'chart',
+                        'permission' => 'contracts.reports'
                     ]
                 ]
             ]
@@ -64,274 +99,154 @@ class Module extends BaseModule
 }
 ```
 
-### Exibir Menu na View
+---
+
+## 🛡️ Filtros de Visibilidade e Segurança
+
+O `MenuRegistry::all()` aplica automaticamente filtros em cascata antes de retornar os itens para o layout:
+
+### 1. Permissões e Grupos do CodeIgniter Shield
+- **`permission`**: Se definida, valida se `auth()->user()->can($permission)`. Se falso, remove o item.
+- **`group`**: Valida se o usuário pertence ao grupo especificado (`$user->inGroup(...)`).
+
+### 2. Multi-Tenancy
+- **`tenant => true`**: O item só aparece quando um tenant estiver ativo (`has_tenant() === true`).
+- **`tenant => false`**: O item só aparece no painel global da plataforma (sem tenant).
+- **`tenant => ['empresa-a', 'empresa-b']`**: O item só aparece para os tenants listados.
+- **Módulos Permitidos no Perfil do Tenant**: Se a configuração `Tenancy::$tenantProfiles` restringir módulos para aquele tenant, módulos não contratados têm seus menus ocultados automaticamente.
+
+### 3. Sanitização contra XSS e Protocol Injection
+- Labels recebem escape seguro via `esc($label, 'html')` e ficam disponíveis em `label_escaped`.
+- URLs contendo prefixos `javascript:`, `data:` ou `vbscript:` são neutralizadas para `#`.
+
+---
+
+## 🎨 IconRegistry Seguro
+
+Evita que módulos externos injetem código HTML arbitrário em atributos de tags `<i>`:
+
+```php
+use Rahpt\Ci4ModuleNav\Support\IconRegistry;
+
+// 1. Resolução segura de classe CSS
+$class = IconRegistry::resolve('contracts');
+// Retorna: 'fas fa-file-contract'
+
+// 2. Renderização direta de tag HTML
+echo IconRegistry::render('dashboard', 'mr-2 text-primary');
+// Retorna: '<i class="fas fa-tachometer-alt mr-2 text-primary"></i>'
+
+// 3. Registrar ou sobrescrever mapeamentos no bootstrap
+IconRegistry::register('pix', 'fab fa-pix');
+```
+
+Mapeamentos padrão incluídos: `home`, `dashboard`, `users`, `user`, `settings`, `tools`, `file`, `contracts`, `calendar`, `tasks`, `folder`, `database`, `chart`, `shield`, `lock`, `bell`, `mail`, `box`, `building`, `store`, `circle`.
+
+---
+
+## ⚡ Cache Multi-Tenant e ACL Versionado
+
+Para garantir máxima velocidade sem vazamento de visão entre usuários ou empresas, o sistema utiliza versionamento atômico:
+
+```
+module_menus_v{version}_{tenantId}_{userId}_acl{aclHash}
+```
+
+- **`version`**: Versão global do cache. Quando um módulo é ativado, desativado ou atualizado (`rahpt.module.changed`), a versão é incrementada atomicamente, invalidando o cache instantaneamente sem locks.
+- **`tenantId`**: Impede que a visão de menus de uma empresa seja servida a outra.
+- **`userId`**: Mantém as particularidades da sessão de cada usuário.
+- **`aclHash`**: Hash MD5 curto dos grupos e permissões ativas. Se o papel do usuário mudar, o cache se renova de forma transparente.
+
+---
+
+## 🍞 Breadcrumbs e Helpers
+
+O pacote registra helpers automáticos carregados pelo CodeIgniter:
+
+```php
+// No Controller
+set_breadcrumb('Início', '/');
+set_breadcrumb('Contratos', 'contratos');
+set_breadcrumb('Editar Contrato #42'); // Sem URL: marca página ativa
+
+// Na View
+<?= render_breadcrumbs(' / ') ?>
+```
+
+---
+
+## 🖥️ Exibição em Layouts (Exemplo AdminLTE)
 
 ```php
 <?php
 use Rahpt\Ci4ModuleNav\MenuRegistry;
+use Rahpt\Ci4ModuleNav\Support\IconRegistry;
 
 $menus = MenuRegistry::all();
 ?>
 
-<nav>
-    <ul>
-        <?php foreach ($menus as $item): ?>
-            <li>
-                <a href="<?= base_url($item['url']) ?>">
-                    <?php if(isset($item['icon'])): ?>
-                        <i class="<?= $item['icon'] ?>"></i>
+<ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu">
+    <?php foreach ($menus as $item): ?>
+        <?php $hasChildren = !empty($item['items']); ?>
+        <li class="nav-item <?= $hasChildren ? 'has-treeview' : '' ?>">
+            <a href="<?= base_url($item['url'] ?? '#') ?>" class="nav-link">
+                <?= IconRegistry::render($item['icon'] ?? 'circle', 'nav-icon') ?>
+                <p>
+                    <?= $item['label_escaped'] ?? $item['label'] ?>
+                    <?php if ($hasChildren): ?>
+                        <i class="right fas fa-angle-left"></i>
                     <?php endif; ?>
-                    <?= $item['label'] ?>
-                </a>
-                
-                <?php if(isset($item['children'])): ?>
-                    <ul>
-                        <?php foreach ($item['children'] as $child): ?>
-                            <li>
-                                <a href="<?= base_url($child['url']) ?>">
-                                    <?= $child['label'] ?>
-                                </a>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-            </li>
-        <?php endforeach; ?>
-    </ul>
-</nav>
-```
+                </p>
+            </a>
 
-### Breadcrumbs
-
-```php
-// No Controller
-set_breadcrumb('Home', '/');
-set_breadcrumb('Dashboard', 'dashboard');
-set_breadcrumb('Relatórios'); // Sem URL = item atual
-
-// Na View
-<?= render_breadcrumbs() ?>
-
-// Output:
-// Home > Dashboard > Relatórios
-```
-
----
-
-## 🎨 Helper Functions
-
-### set_breadcrumb()
-
-Adiciona item ao breadcrumb.
-
-```php
-set_breadcrumb(string $label, ?string $url = null): void
-```
-
-**Exemplos**:
-```php
-set_breadcrumb('Home', '/');
-set_breadcrumb('Produtos', 'products');
-set_breadcrumb('Editar'); // Página atual
-```
-
-### render_breadcrumbs()
-
-Renderiza HTML dos breadcrumbs.
-
-```php
-render_breadcrumbs(string $separator = '>'): string
-```
-
-**Customizar**:
-```php
-// Com separador customizado
-<?= render_breadcrumbs(' / ') ?>
-// Home / Dashboard / Relatórios
-
-// Com classes CSS
-<?= render_breadcrumbs(' > ', 'breadcrumb-list') ?>
-```
-
----
-
-## ⚡ Performance: Caching
-
-### Cache Automático
-
-Menus são automaticamente cacheados por **1 hora**.
-
-```php
-// Primeira chamada: Busca de todos os módulos
-$menus = MenuRegistry::all();
-
-// Próximas chamadas (dentro de 1h): Retorna do cache
-$menus = MenuRegistry::all(); // Instantâneo!
-```
-
-### Limpar Cache
-
-Quando um módulo é ativado/desativado, o cache é automaticamente limpo.
-
-**Manual**:
-```php
-MenuRegistry::clearCache();
+            <?php if ($hasChildren): ?>
+                <ul class="nav nav-treeview pl-3">
+                    <?php foreach ($item['items'] as $sub): ?>
+                        <li class="nav-item">
+                            <a href="<?= base_url($sub['url']) ?>" class="nav-link">
+                                <?= IconRegistry::render($sub['icon'] ?? 'circle', 'nav-icon') ?>
+                                <p><?= $sub['label_escaped'] ?? $sub['label'] ?></p>
+                            </a>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </li>
+    <?php endforeach; ?>
+</ul>
 ```
 
 ---
 
 ## 🔧 API Reference
 
-### MenuRegistry::all()
+### `MenuRegistry::all(): array`
+Retorna array consolidado de menus de todos os módulos ativos com os filtros de permissão, tenancy e segurança aplicados.
 
-Retorna array consolidado de todos os menus dos módulos ativos.
+### `MenuRegistry::grouped(): array`
+Retorna menus agrupados por categoria/seção.
 
-```php
-$menus = MenuRegistry::all();
-// [
-//     [
-//         'label' => 'Dashboard',  
-//         'url' => 'dashboard',
-//         'icon' => 'fas fa-tachometer-alt',
-//         'order' => 1
-//     ],
-//     ...
-// ]
-```
-
-### MenuRegistry::clearCache()
-
-Limpa o cache de menus.
-
-```php
-MenuRegistry::clearCache();
-```
-
----
-
-## 📦 Integração com Layouts
-
-### AdminLTE Example
-
-```php
-<!-- app/Views/layouts/adminlte.php -->
-<aside class="main-sidebar sidebar-dark-primary">
-    <div class="sidebar">
-        <nav class="mt-2">
-            <ul class="nav nav-pills nav-sidebar flex-column">
-                <?php
-                use Rahpt\Ci4ModuleNav\MenuRegistry;
-                $menus = MenuRegistry::all();
-                
-                foreach ($menus as $item):
-                ?>
-                    <li class="nav-item">
-                        <a href="<?= base_url($item['url']) ?>" class="nav-link">
-                            <i class="nav-icon <?= $item['icon'] ?? 'fas fa-circle' ?>"></i>
-                            <p><?= $item['label'] ?></p>
-                        </a>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-        </nav>
-    </div>
-</aside>
-```
-
-### Bootstrap Example
-
-```php
-<nav aria-label="breadcrumb">
-    <ol class="breadcrumb">
-        <?php
-        $breadcrumbs = get_breadcrumbs();
-        $count = count($breadcrumbs);
-        
-        foreach ($breadcrumbs as $index => $crumb):
-            $isLast = ($index === $count - 1);
-        ?>
-            <li class="breadcrumb-item <?= $isLast ? 'active' : '' ?>">
-                <?php if ($isLast || empty($crumb['url'])): ?>
-                    <?= $crumb['label'] ?>
-                <?php else: ?>
-                    <a href="<?= base_url($crumb['url']) ?>">
-                        <?= $crumb['label'] ?>
-                    </a>
-                <?php endif; ?>
-            </li>
-        <?php endforeach; ?>
-    </ol>
-</nav>
-```
-
----
-
-## 🎨 Customização Avançada
-
-### Ordenação de Menus
-
-```php
-public function menu(): array
-{
-    return [
-        [
-            'label' => 'Dashboard',
-            'order' => 1  // Primeiro
-        ],
-        [
-            'label' => 'Configurações',
-            'order' => 100  // Último
-        ]
-    ];
-}
-```
-
-### Menus Condicionais
-
-```php
-public function menu(): array
-{
-    $menus = [
-        [
-            'label' => 'Dashboard',
-            'url' => 'dashboard',
-            'icon' => 'fas fa-tachometer-alt'
-        ]
-    ];
-    
-    // Adicionar apenas se usuário tem permissão
-    if (auth()->user()->can('manage.users')) {
-        $menus[] = [
-            'label' => 'Usuários',
-            'url' => 'users',
-            'icon' => 'fas fa-users'
-        ];
-    }
-    
-    return $menus;
-}
-```
-
----
-
-## 🧪 Testes
-
-```bash
-composer test
-```
+### `MenuRegistry::clearCache(): void`
+Incrementa a versão global do cache, forçando renovação atômica em toda a aplicação.
 
 ---
 
 ## 🕒 Histórico de Versões
 
+### [1.3.0] - 2026-09-26
+- **Novo**: `IconRegistry` centralizado com allowlist e renderização segura contra injeção de HTML.
+- **Novo**: Filtro nativo de permissões e grupos do CodeIgniter Shield nos menus (`permission`, `group`).
+- **Novo**: Filtragem granular por Multi-Tenancy (`tenant`, perfis de módulos por tenant).
+- **Novo**: Cache atômico com versionamento multi-tenant e hash ACL de permissões.
+- **Novo**: Sanitização estrita contra esquemas de URL perigosos (`javascript:`, `data:`).
+- **Novo**: Método `MenuRegistry::grouped()` para categorização de menus.
+
 ### [1.2.0] - 2026-02-26
-- **Bug Fix**: Resolvido problema de colisão de cache entre usuários. O cache agora é segmentado por ID de usuário para suportar menus com dados dinâmicos (como UIDs de perfil).
-- **Melhoria**: Refatoração da chave de cache para maior isolamento de dados entre sessões.
+- **Bug Fix**: Resolvido problema de colisão de cache entre usuários com UIDs dinâmicos.
 
 ### [1.1.0] - 2026-02-16
-- **Melhoria**: Integrado suporte a **Rota Nomeada (Alias)** em `currentRoute()`, tornando os breadcrumbs e menus ativos imunes a mudanças de URL.
-- **Performance**: Implementação de escuta de eventos (`rahpt.module.changed`) para limpeza reativa de cache de menus, eliminando verificação manual de status.
-- **Arquitetura**: Uso do `Registrar` para carregamento automático de Eventos e Helpers.
+- **Melhoria**: Rota Nomeada (Alias) via `url_to()` no helper e menus.
+- **Performance**: Invalidação reativa via evento `rahpt.module.changed`.
 
 ### [1.0.1] - 2026-02-15
 - Versão inicial estável.
@@ -340,15 +255,4 @@ composer test
 
 ## 📄 Licença
 
-MIT License
-
----
-
-## 👏 Créditos
-
-Desenvolvido por **Rahpt**
-
----
-
-**Versão**: 1.2.0  
-**Última Atualização**: 2026-02-26
+MIT License. Desenvolvido por **Rahpt**.
