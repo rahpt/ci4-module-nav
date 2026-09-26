@@ -182,13 +182,23 @@ class MenuRegistry
             }
         }
 
-        // 4. Manual Tenancy Check (Specific Tenant IDs)
-        if (isset($item['tenant']) && function_exists('tenant')) {
-            $currentTenantId = tenant();
-            $allowedTenants = (array) $item['tenant'];
+        // 4. Tenancy Check (supports boolean requirement or specific tenant list)
+        if (isset($item['tenant'])) {
+            $hasActiveTenant = function_exists('tenant') && tenant() !== null && tenant() !== '';
 
-            if ($currentTenantId && !in_array($currentTenantId, $allowedTenants, true)) {
-                return false;
+            if (is_bool($item['tenant'])) {
+                if ($item['tenant'] === true && !$hasActiveTenant) {
+                    return false; // Requires active tenant
+                }
+                if ($item['tenant'] === false && $hasActiveTenant) {
+                    return false; // Global only
+                }
+            } else {
+                $allowedTenants = (array) $item['tenant'];
+                $currentTenantId = function_exists('tenant') ? (string) tenant() : '';
+                if (!in_array($currentTenantId, $allowedTenants, true)) {
+                    return false;
+                }
             }
         }
 
@@ -200,6 +210,41 @@ class MenuRegistry
         }
 
         return true;
+    }
+
+    /**
+     * Returns menus organized by hierarchical structure: section -> group -> items.
+     * Items are sorted by priority ascending.
+     *
+     * @return array<string, array<string, list<array>>>
+     */
+    public static function grouped(): array
+    {
+        $all = self::all();
+        $grouped = [];
+
+        foreach ($all as $item) {
+            $section = $item['section'] ?? 'Main';
+            $group = $item['group'] ?? 'Default';
+
+            if (!isset($grouped[$section])) {
+                $grouped[$section] = [];
+            }
+            if (!isset($grouped[$section][$group])) {
+                $grouped[$section][$group] = [];
+            }
+
+            $grouped[$section][$group][] = $item;
+        }
+
+        // Sort items inside groups by priority
+        foreach ($grouped as $sec => $groups) {
+            foreach ($groups as $grp => $items) {
+                usort($grouped[$sec][$grp], fn ($a, $b) => ($a['priority'] ?? $a['_priority'] ?? 0) <=> ($b['priority'] ?? $b['_priority'] ?? 0));
+            }
+        }
+
+        return $grouped;
     }
 
     /**
