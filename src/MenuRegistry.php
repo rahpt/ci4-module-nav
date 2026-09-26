@@ -15,17 +15,27 @@ class MenuRegistry
 
     /**
      * Returns the consolidated list of menus from all active modules, filtered by permissions and tenant.
+     * Note: Menu visibility is a presentation layer concern and does NOT replace Controller/Policy authorization.
      */
     public static function all(): array
     {
         $cache = service('cache');
         $version = (int) ($cache->get(self::CACHE_VERSION_KEY) ?? 1);
 
-        $userId = function_exists('auth') && auth()->user() ? auth()->user()->id : 'guest';
+        $user = function_exists('auth') ? auth()->user() : null;
+        $userId = $user ? $user->id : 'guest';
         $tenantId = function_exists('tenant') && tenant() ? (string) tenant() : 'global';
 
-        // Contextual cache key incorporating version, tenant, and user ID
-        $cacheKey = "module_menus_v{$version}_{$tenantId}_{$userId}";
+        // ACL versioning: Incorporate groups and permissions hash so role changes invalidate cache immediately
+        $aclHash = 'guest';
+        if ($user) {
+            $permissions = method_exists($user, 'getPermissions') ? $user->getPermissions() : [];
+            $groups = method_exists($user, 'getGroups') ? $user->getGroups() : [];
+            $aclHash = substr(md5(implode(',', $groups) . ':' . implode(',', $permissions)), 0, 8);
+        }
+
+        // Contextual cache key incorporating version, tenant, user ID, and ACL hash
+        $cacheKey = "module_menus_v{$version}_{$tenantId}_{$userId}_acl{$aclHash}";
 
         if (($cachedMenus = $cache->get($cacheKey)) !== null) {
             return $cachedMenus;
@@ -106,9 +116,28 @@ class MenuRegistry
                 $item['items'] = self::applyFilters($item['items']);
             }
 
-            // Security: sanitize labels and urls if needed
+            // Security: sanitize labels
             if (isset($item['label']) && function_exists('esc')) {
                 $item['label_escaped'] = esc($item['label'], 'html');
+            }
+
+            // Safe Icon allowlisting
+            if (isset($item['icon'])) {
+                $item['icon_class'] = \Rahpt\Ci4ModuleNav\Support\IconRegistry::resolve($item['icon']);
+            }
+
+            // Route-to-URL normalization
+            if (isset($item['route']) && empty($item['url']) && function_exists('url_to')) {
+                try {
+                    $item['url'] = url_to($item['route']);
+                } catch (\Throwable) {
+                    $item['url'] = $item['route'];
+                }
+            }
+
+            // Prevent dangerous URI schemes (e.g. javascript:)
+            if (isset($item['url']) && preg_match('/^(javascript|data|vbscript):/i', trim($item['url']))) {
+                $item['url'] = '#';
             }
 
             $filtered[] = $item;
